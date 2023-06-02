@@ -1,4 +1,4 @@
-const { MalSymbol, MalValue, MalList, MalVector, MalNil, MalBool, MalMap } = require('./types.js');
+const { MalSymbol, MalValue, MalList, MalVector, MalNil, MalMap, MalKeyword, MalString } = require('./types.js');
 
 class Reader {
   constructor(tokens) {
@@ -65,15 +65,23 @@ const read_atom = reader => {
   }
 
   if (token === "true") {
-    return new MalBool(token);
+    return true;
   }
 
   if (token === "false") {
-    return new MalBool(token);
+    return false;
   }
 
   if (token === 'nil') {
     return new MalNil();
+  }
+
+  if (token.startsWith(':')) {
+    return new MalKeyword(token);
+  }
+
+  if (token.startsWith('"')) {
+    return new MalString(token);
   }
 
   return new MalSymbol(token);
