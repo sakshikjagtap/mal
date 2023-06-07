@@ -1,4 +1,4 @@
-const { MalSymbol, MalValue, MalList, MalVector, MalNil, MalMap, MalKeyword, MalString } = require('./types.js');
+const { MalSymbol, MalValue, MalList, MalVector, MalNil, MalMap, MalKeyword, MalString, createMalString } = require('./types.js');
 
 class Reader {
   constructor(tokens) {
@@ -21,7 +21,6 @@ class Reader {
 const tokenize = str => {
   const re =
     /[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)/g;
-
   return [...str.matchAll(re)].map(x => x[1]).slice(0, -1);
 }
 
@@ -81,10 +80,17 @@ const read_atom = reader => {
   }
 
   if (token.startsWith('"')) {
-    return new MalString(token);
+    return createMalString(token.slice(1, -1));
   }
 
   return new MalSymbol(token);
+}
+
+const prependSymbol = (reader, symbolStr) => {
+  reader.next();
+  const symbol = new MalSymbol(symbolStr);
+  const newAst = read_form(reader);
+  return new MalList([symbol, newAst]);
 }
 
 const read_form = reader => {
@@ -96,6 +102,19 @@ const read_form = reader => {
       return read_vector(reader);
     case '{':
       return read_map(reader);
+    case "@":
+      return prependSymbol(reader, 'deref');
+    case "'":
+      return prependSymbol(reader, 'quote');
+    case ";":
+      reader.next()
+      return new MalNil();
+    case "`":
+      return prependSymbol(reader, 'quasiquote');
+    case "~":
+      return prependSymbol(reader, 'unquote');
+    case "~@":
+      return prependSymbol(reader, 'splice-unquote');
     default:
       return read_atom(reader);
   }

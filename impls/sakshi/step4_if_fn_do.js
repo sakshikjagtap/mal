@@ -3,6 +3,7 @@ const { read_str } = require('./reader.js');
 const { pr_str } = require('./printer.js');
 const { MalSymbol, MalList, MalValue, MalVector, MalMap, MalNil, MalString } = require('./types.js');
 const { Env } = require('./env.js');
+const { core } = require('./core.js');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -96,11 +97,14 @@ const handleDef = (ast, env) => {
 }
 
 const handleLet = (ast, env) => {
-  const newEnv = new Env(env);
-  for (i = 0; i < ast.value[1].value.length; i += 2) {
+  const [binds, ...forms] = ast.value.slice(1);
+  const newEnv = new Env(env, binds, forms);
+
+  for (let i = 0; i < ast.value[1].value.length; i += 2) {
     newEnv.set(ast.value[1].value[i], EVAL(ast.value[1].value[i + 1], newEnv))
   }
-  return EVAL(ast.value[2], newEnv);
+  const doForms = new MalList([new MalSymbol('do'), ...forms]);
+  return EVAL(doForms, newEnv);
 }
 
 const handleDo = (ast, env) => {
@@ -118,11 +122,11 @@ const handleIf = (ast, env) => {
 }
 
 const handleFn = (ast, env) => {
-  const [, args, fnBody] = ast.value;
+  const [, args, ...fnBody] = ast.value;
   const clojure = (...fnArgs) => {
-    const fnEnv = new Env(env);
-    args.value.forEach((arg, i) => fnEnv.set(arg, fnArgs[i]));
-    return EVAL(fnBody, fnEnv);
+    const fnEnv = new Env(env, args.value, fnArgs);
+    const doForms = new MalList([new MalSymbol('do'), ...fnBody]);
+    return EVAL(doForms, fnEnv);
   }
   clojure.toString = () => '#<function>';
   return clojure;
@@ -153,37 +157,44 @@ const EVAL = (ast, env) => {
   return fn.apply(null, args);
 
 };
-const PRINT = str => pr_str(str);
+const PRINT = str => pr_str(str, true);
 
 const env = new Env();
-env.set(new MalValue('+'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value + ele.value)))
-env.set(new MalValue('-'), (...args) => substraction(args))
-env.set(new MalValue('*'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value * ele.value)))
-env.set(new MalValue('/'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value / ele.value)))
-env.set(new MalValue('='), (...args) => deepEquals(args, env));
-env.set(new MalValue('>'), (...args) => operate(greaterThan, args));
-env.set(new MalValue('<'), (...args) => operate(lessThan, args));
-env.set(new MalValue('>='), (...args) => operate(greaterThanOrEqual, args));
-env.set(new MalValue('<='), (...args) => operate(lessThanOrEqual, args));
+// env.set(new MalValue('+'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value + ele.value)))
+// env.set(new MalValue('-'), (...args) => substraction(args))
+// env.set(new MalValue('*'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value * ele.value)))
+// env.set(new MalValue('/'), (...args) => args.reduce((sum, ele) => new MalValue(sum.value / ele.value)))
+// env.set(new MalValue('='), (...args) => deepEquals(args, env));
+// env.set(new MalValue('>'), (...args) => operate(greaterThan, args));
+// env.set(new MalValue('<'), (...args) => operate(lessThan, args));
+// env.set(new MalValue('>='), (...args) => operate(greaterThanOrEqual, args));
+// env.set(new MalValue('<='), (...args) => operate(lessThanOrEqual, args));
+// env.set(new MalValue('not'), (arg) => not(arg));
+// env.set(new MalValue('count'), (arg) => {
+//   if (!isIteratoratable(arg)) return 0;
+//   return new MalValue(arg.value.length)
+// });
+// env.set(new MalValue('list'), (...args) => new MalList(args));
+// env.set(new MalValue('list?'), (arg) => arg instanceof MalList);
+// env.set(new MalValue('empty?'), (arg) => arg.value.length === 0);
+// env.set(new MalValue('prn'), (...args) => {
+//   const str = args.reduce((c, e) => c += EVAL(e).value, "");
+//   console.log(str);
+//   return new MalNil()
+// })
+// env.set(new MalValue('str'), (...args) => {
+//   return args.map(e => e.value).join("");
+// });
+// env.set(new MalValue('pr-str'), (...args) => {
+//   return args.map(e => e.value).join(" ");
+// });
+
+const createReplEnv = () => {
+  Object.entries(core).forEach(([s, v]) => env.set(new MalSymbol(s), v));
+}
+
 env.set(new MalValue('not'), (arg) => not(arg));
-env.set(new MalValue('count'), (arg) => {
-  if (!isIteratoratable(arg)) return 0;
-  return new MalValue(arg.value.length)
-});
-env.set(new MalValue('list'), (...args) => new MalList(args));
-env.set(new MalValue('list?'), (arg) => arg instanceof MalList);
-env.set(new MalValue('empty?'), (arg) => arg.value.length === 0);
-env.set(new MalValue('prn'), (...args) => {
-  const str = args.reduce((c, e) => c += EVAL(e).value, "");
-  console.log(str);
-  return new MalNil()
-})
-env.set(new MalValue('str'), (...args) => {
-  (args.map(ele => ele.pr_str()).join(""));
-
-});
-env.set(new MalValue('pr-str'), (...args) => args.map(ele => ele.pr_str()).join(" "));
-
+createReplEnv();
 
 const rep = str => PRINT(EVAL(READ(str), env));
 

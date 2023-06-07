@@ -1,10 +1,3 @@
-const { MalValue } = require("./types");
-
-const pr_str = (malValue) => {
-  if (malValue instanceof MalValue)
-    return malValue.pr_str(malValue);
-
-  return malValue.toString();
-}
+const { MalValue, pr_str } = require("./types");
 
 module.exports = { pr_str };
